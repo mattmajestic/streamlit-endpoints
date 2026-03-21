@@ -1,24 +1,34 @@
 import os
 import streamlit as st
-import fastf1
+import httpx
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from dotenv import load_dotenv
 
-CACHE_DIR = "/tmp/fastf1_cache"
-os.makedirs(CACHE_DIR, exist_ok=True)
-fastf1.Cache.enable_cache(CACHE_DIR)
+load_dotenv(".env.local")
+
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8501")
+
+COMPOUND_COLORS = {
+    "SOFT": "#e8002d",
+    "MEDIUM": "#ffd700",
+    "HARD": "#eeeeee",
+    "INTERMEDIATE": "#39b54a",
+    "WET": "#0067ff",
+}
 
 st.title("🏎️ FastF1 Analytics")
 
-# --- Controls ---
 col1, col2, col3 = st.columns(3)
 year = col1.selectbox("Season", [2025, 2024, 2023])
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_schedule(year: int) -> pd.DataFrame:
-    return fastf1.get_event_schedule(year, include_testing=False)[
-        ["RoundNumber", "EventName", "Country", "EventDate"]
-    ].copy()
+    resp = httpx.get(f"{BASE_URL}/f1/schedule", params={"year": year}, timeout=60)
+    resp.raise_for_status()
+    return pd.DataFrame(resp.json()["schedule"])
 
 
 with st.spinner("Loading calendar..."):
@@ -36,13 +46,15 @@ session_code = {"Race": "R", "Qualifying": "Q"}[session_label]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_session(year: int, round_num: int, stype: str):
-    session = fastf1.get_session(year, round_num, stype)
-    session.load(telemetry=False, weather=False, messages=False)
-    laps = session.laps[
-        ["Driver", "Team", "LapNumber", "LapTime", "Compound", "IsPersonalBest"]
-    ].copy()
-    laps["LapTimeSec"] = laps["LapTime"].dt.total_seconds()
-    results = session.results.copy()
+    resp = httpx.get(
+        f"{BASE_URL}/f1/results",
+        params={"year": year, "round": round_num, "session": stype},
+        timeout=120,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    laps = pd.DataFrame(data["laps"])
+    results = pd.DataFrame(data["results"])
     return laps, results
 
 
@@ -57,58 +69,181 @@ st.divider()
 
 # ── RACE ──────────────────────────────────────────────────────────────────────
 if session_label == "Race":
-    # Metrics
     winner = results.iloc[0]
-    fastest = laps[laps["IsPersonalBest"] == True].nsmallest(1, "LapTimeSec")
-    m1, m2, m3 = st.columns(3)
+    fastest = laps[laps["IsPersonalBest"] == True].nsmallest(1, "LapTimeSec") if "IsPersonalBest" in laps.columns else pd.DataFrame()
+
+    # Top metrics
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Winner", winner.get("Abbreviation", "—"))
     m2.metric("Team", winner.get("TeamName", "—"))
     if not fastest.empty:
         fl = fastest.iloc[0]
-        m3.metric("Fastest Lap", f"{fl['Driver']}  {fl['LapTimeSec']:.3f}s")
+        m3.metric("Fastest Lap", fl["Driver"])
+        m4.metric("Fastest Time", f"{fl['LapTimeSec']:.3f}s")
 
     st.divider()
 
-    # Results table
-    st.subheader("Race Results")
-    race_cols = [c for c in ["Position", "Abbreviation", "FullName", "TeamName", "GridPosition", "Points", "Status"] if c in results.columns]
-    display = results[race_cols].copy()
-    if "Position" in display.columns:
-        display["Position"] = pd.to_numeric(display["Position"], errors="coerce").astype("Int64")
-    if "Points" in display.columns:
-        display["Points"] = pd.to_numeric(display["Points"], errors="coerce").astype("Int64")
-    st.dataframe(display, use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    # Lap time chart – top 5 finishers only to keep chart readable
-    st.subheader("Lap time evolution — top 5 finishers")
+    # Lap time evolution — top 5 with animation
+    st.subheader("Lap Times — Top 5 Finishers")
     top5 = results["Abbreviation"].head(5).tolist()
-    chart_laps = (
-        laps[laps["Driver"].isin(top5)]
-        .dropna(subset=["LapTimeSec"])
-        .query("LapTimeSec < LapTimeSec.quantile(0.99)")  # drop safety car outliers
-    )
+    chart_laps = laps[laps["Driver"].isin(top5)].dropna(subset=["LapTimeSec"]).copy()
     if not chart_laps.empty:
-        pivot = chart_laps.pivot_table(
-            index="LapNumber", columns="Driver", values="LapTimeSec", aggfunc="median"
+        p99 = chart_laps["LapTimeSec"].quantile(0.99)
+        chart_laps = chart_laps[chart_laps["LapTimeSec"] < p99]
+        chart_laps["LapNumber"] = pd.to_numeric(chart_laps["LapNumber"], errors="coerce")
+        chart_laps = chart_laps.dropna(subset=["LapNumber"])
+
+        # Fixed axis ranges so scale never changes during animation
+        y_min = chart_laps["LapTimeSec"].min() - 0.5
+        y_max = chart_laps["LapTimeSec"].max() + 0.5
+        x_max = chart_laps["LapNumber"].max()
+
+        # Assign consistent colors to each driver
+        palette = px.colors.qualitative.Plotly
+        driver_color = {drv: palette[i % len(palette)] for i, drv in enumerate(top5)}
+
+        lt_laps = sorted(chart_laps["LapNumber"].unique())
+
+        lt_frames = []
+        for lap in lt_laps:
+            fd = chart_laps[chart_laps["LapNumber"] <= lap]
+            lt_frames.append(go.Frame(
+                data=[
+                    go.Scatter(
+                        x=fd[fd["Driver"] == drv]["LapNumber"].tolist(),
+                        y=fd[fd["Driver"] == drv]["LapTimeSec"].tolist(),
+                        mode="lines+markers",
+                        name=drv,
+                        line=dict(color=driver_color[drv]),
+                        marker=dict(color=driver_color[drv]),
+                        showlegend=True,
+                    )
+                    for drv in top5
+                ],
+                name=str(int(lap)),
+            ))
+
+        # Default to showing all laps (last frame)
+        full_data = [
+            go.Scatter(
+                x=chart_laps[chart_laps["Driver"] == drv]["LapNumber"].tolist(),
+                y=chart_laps[chart_laps["Driver"] == drv]["LapTimeSec"].tolist(),
+                mode="lines+markers",
+                name=drv,
+                line=dict(color=driver_color[drv]),
+                marker=dict(color=driver_color[drv]),
+                showlegend=True,
+            )
+            for drv in top5
+        ]
+
+        fig_lt = go.Figure(data=full_data, frames=lt_frames)
+        fig_lt.update_layout(
+            xaxis=dict(title="Lap", range=[1, x_max], fixedrange=False),
+            yaxis=dict(title="Lap Time (s)", range=[y_min, y_max], fixedrange=False),
+            height=420,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            legend=dict(orientation="v", x=1.01, y=1, traceorder="normal"),
+            updatemenus=[{
+                "type": "buttons",
+                "showactive": False,
+                "y": 1.12,
+                "x": 0.5,
+                "xanchor": "center",
+                "buttons": [
+                    {"label": "▶ Play", "method": "animate", "args": [None, {"frame": {"duration": 120, "redraw": True}, "fromcurrent": False}]},
+                    {"label": "⏸ Pause", "method": "animate", "args": [[None], {"frame": {"duration": 0}, "mode": "immediate"}]},
+                ],
+            }],
+            sliders=[{
+                "steps": [{"args": [[f.name], {"frame": {"duration": 120}, "mode": "immediate"}], "label": f.name, "method": "animate"} for f in lt_frames],
+                "x": 0.05, "len": 0.9, "y": -0.05,
+                "currentvalue": {"prefix": "Lap: ", "visible": True, "xanchor": "center"},
+                "active": len(lt_frames) - 1,
+            }],
         )
-        st.line_chart(pivot)
-    else:
-        st.info("No lap time data available.")
+        st.plotly_chart(fig_lt, use_container_width=True)
+
+    # Position changes in 2 columns below lap times
+    if "GridPosition" in results.columns and "Position" in results.columns:
+        st.divider()
+        rc = results.copy()
+        rc["GridPos"] = pd.to_numeric(rc["GridPosition"], errors="coerce")
+        rc["FinishPos"] = pd.to_numeric(rc["Position"], errors="coerce")
+        rc["Change"] = rc["GridPos"] - rc["FinishPos"]
+        rc = rc.dropna(subset=["GridPos", "FinishPos", "Change", "Abbreviation"])
+        rc = rc.sort_values("FinishPos")
+
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            st.subheader("Positions Gained / Lost")
+            fig_changes = go.Figure(go.Bar(
+                x=rc["Abbreviation"],
+                y=rc["Change"],
+                marker_color=["#2ecc71" if c > 0 else "#e74c3c" if c < 0 else "#95a5a6" for c in rc["Change"]],
+                text=[f"+{int(c)}" if c > 0 else str(int(c)) if c != 0 else "—" for c in rc["Change"]],
+                textposition="outside",
+            ))
+            fig_changes.update_layout(
+                xaxis_title="Driver",
+                yaxis_title="Positions",
+                height=350,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                yaxis=dict(zeroline=True, zerolinecolor="#444"),
+            )
+            st.plotly_chart(fig_changes, use_container_width=True)
+
+        with col_right:
+            st.subheader("Grid vs Finish Position")
+            fig_grid = go.Figure()
+            fig_grid.add_trace(go.Scatter(
+                x=rc["GridPos"],
+                y=rc["FinishPos"],
+                mode="markers+text",
+                text=rc["Abbreviation"],
+                textposition="top center",
+                marker=dict(
+                    size=10,
+                    color=rc["Change"],
+                    colorscale="RdYlGn",
+                    showscale=False,
+                ),
+            ))
+            fig_grid.add_shape(type="line", x0=1, y0=1, x1=rc["GridPos"].max(), y1=rc["GridPos"].max(),
+                               line=dict(color="#555", dash="dash"))
+            fig_grid.update_layout(
+                xaxis=dict(title="Grid Position", autorange="reversed"),
+                yaxis=dict(title="Finish Position", autorange="reversed"),
+                height=350,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+            )
+            st.plotly_chart(fig_grid, use_container_width=True)
 
     st.divider()
 
-    # Compound / stint breakdown
-    st.subheader("Tyre compounds used")
-    compounds = (
-        laps.dropna(subset=["Compound"])
-        .groupby(["Driver", "Compound"])
-        .size()
-        .reset_index(name="Laps")
-        .sort_values(["Driver", "Compound"])
-    )
-    st.dataframe(compounds, use_container_width=True, hide_index=True)
+    # Tyre strategy timeline
+    st.subheader("Tyre Strategy")
+    strat = laps.dropna(subset=["Compound", "LapNumber"]).copy() if "Compound" in laps.columns else pd.DataFrame()
+    if not strat.empty:
+        fig_tyre = px.scatter(
+            strat,
+            x="LapNumber",
+            y="Driver",
+            color="Compound",
+            color_discrete_map=COMPOUND_COLORS,
+            labels={"LapNumber": "Lap", "Driver": "Driver"},
+            height=max(400, len(strat["Driver"].unique()) * 22),
+        )
+        fig_tyre.update_traces(marker=dict(size=7, symbol="square"))
+        fig_tyre.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
+        st.plotly_chart(fig_tyre, use_container_width=True)
 
 
 # ── QUALIFYING ────────────────────────────────────────────────────────────────
@@ -117,37 +252,44 @@ else:
     m1, m2 = st.columns(2)
     m1.metric("Pole Position", pole.get("Abbreviation", "—"))
     m2.metric("Team", pole.get("TeamName", "—"))
-
     st.divider()
 
-    # Results table
-    st.subheader("Qualifying Results")
-    q_cols = [c for c in ["Position", "Abbreviation", "FullName", "TeamName", "Q1", "Q2", "Q3"] if c in results.columns]
-    display = results[q_cols].copy()
-
-    # Format timedelta Q columns as mm:ss.sss strings
-    for col in ["Q1", "Q2", "Q3"]:
-        if col in display.columns:
-            display[col] = display[col].apply(
-                lambda t: f"{int(t.total_seconds() // 60)}:{t.total_seconds() % 60:06.3f}"
-                if pd.notnull(t) and hasattr(t, "total_seconds") else ""
-            )
-    if "Position" in display.columns:
-        display["Position"] = pd.to_numeric(display["Position"], errors="coerce").astype("Int64")
-
-    st.dataframe(display, use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    # Q3 lap times bar chart
-    st.subheader("Q3 lap times (top 10)")
-    if "Q3" in results.columns:
-        q3 = results[["Abbreviation", "Q3"]].dropna(subset=["Q3"]).head(10).copy()
-        q3["Q3sec"] = q3["Q3"].apply(
+    # Q1 / Q2 / Q3 gap-to-pole horizontal bar charts
+    for q_col in ["Q3", "Q2", "Q1"]:
+        if q_col not in results.columns:
+            continue
+        q_data = results[["Abbreviation", q_col]].dropna(subset=[q_col]).copy()
+        if q_data.empty:
+            continue
+        q_data["Seconds"] = q_data[q_col].apply(
             lambda t: t.total_seconds() if hasattr(t, "total_seconds") else None
         )
-        q3 = q3.dropna(subset=["Q3sec"]).set_index("Abbreviation")
-        if not q3.empty:
-            st.bar_chart(q3["Q3sec"])
-    else:
-        st.info("Q3 data not available for this session.")
+        q_data = q_data.dropna(subset=["Seconds"]).sort_values("Seconds")
+        if q_data.empty:
+            continue
+
+        pole_time = q_data["Seconds"].min()
+        q_data["Gap"] = q_data["Seconds"] - pole_time
+        q_data["Label"] = q_data["Gap"].apply(lambda g: "POLE" if g == 0 else f"+{g:.3f}s")
+
+        st.subheader(f"{q_col} — Gap to Pole")
+        fig_q = px.bar(
+            q_data,
+            x="Gap",
+            y="Abbreviation",
+            orientation="h",
+            text="Label",
+            color="Gap",
+            color_continuous_scale="RdYlGn_r",
+            labels={"Gap": "Gap to Pole (s)", "Abbreviation": "Driver"},
+            height=max(300, len(q_data) * 28),
+        )
+        fig_q.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            coloraxis_showscale=False,
+            yaxis=dict(autorange="reversed"),
+        )
+        fig_q.update_traces(textposition="outside")
+        st.plotly_chart(fig_q, use_container_width=True)
+        st.divider()
