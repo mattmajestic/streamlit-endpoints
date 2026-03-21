@@ -1,0 +1,23 @@
+services:
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      # Hot-reload app code without rebuilding the image
+      - ./app:/app/app
+      # Mount config so changes to config.toml take effect on restart
+      - ./.streamlit:/root/.streamlit:ro
+    environment:
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+      STREAMLIT_SERVER_HEADLESS: "true"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

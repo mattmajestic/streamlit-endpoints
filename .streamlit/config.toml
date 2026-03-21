@@ -1,0 +1,17 @@
+[server]
+port = 8501
+address = "0.0.0.0"
+headless = true
+
+# Enable the experimental Starlette-based server implementation instead of
+# Tornado. This allows mounting custom ASGI/Starlette endpoints alongside
+# the Streamlit app.
+#
+# Default: false
+useStarlette = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
