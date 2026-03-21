@@ -1,5 +1,8 @@
 import os
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv(".env.local")
 
 base_url = os.getenv("API_BASE_URL", "http://localhost:8501")
 

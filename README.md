@@ -2,9 +2,7 @@
 
 A test bed for Streamlit's experimental Starlette server integration. Deployed on Render and Streamlit Cloud to validate custom API route mounting.
 
-[![Deploy on Render](https://render.com/images/deploy-to-render-button.svg)](https://update-this.onrender.com)
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://update-this.streamlit.app)
-
+[![Deploy on Render](https://render.com/images/deploy-to-render-button.svg)](https://streamlit-endpoints.onrender.com)
 ---
 
 ## What this tests
