@@ -1,4 +1,7 @@
+import os
 import streamlit as st
+
+base_url = os.getenv("API_BASE_URL", "http://localhost:8501")
 
 st.title("🔌 Starlette API Demo")
 
@@ -28,10 +31,10 @@ st.info(
 )
 
 with st.expander("Try the API endpoints"):
-    st.code("curl http://localhost:8501/health", language="bash")
-    st.code("curl http://localhost:8501/custom/info", language="bash")
+    st.code(f"curl {base_url}/health", language="bash")
+    st.code(f"curl {base_url}/custom/info", language="bash")
     st.code(
-        'curl -X POST http://localhost:8501/custom/echo \\\n'
+        f'curl -X POST {base_url}/custom/echo \\\n'
         '  -H "Content-Type: application/json" \\\n'
         '  -d \'{"message": "hello"}\'',
         language="bash",
