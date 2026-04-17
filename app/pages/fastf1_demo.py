@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv
+from app.components import vega_metrics, vega_select
 
 load_dotenv(".env.local")
 
@@ -21,7 +22,8 @@ COMPOUND_COLORS = {
 st.title("🏎️ FastF1 Analytics")
 
 col1, col2, col3 = st.columns(3)
-year = col1.selectbox("Season", [2025, 2024, 2023])
+with col1:
+    year = vega_select("Season", [2025, 2024, 2023], key="year")
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -39,8 +41,10 @@ with st.spinner("Loading calendar..."):
         st.stop()
 
 event_map = {row.EventName: int(row.RoundNumber) for row in schedule.itertuples()}
-event_name = col2.selectbox("Grand Prix", list(event_map.keys()))
-session_label = col3.selectbox("Session", ["Race", "Qualifying"])
+with col2:
+    event_name = vega_select("Grand Prix", list(event_map.keys()), key="event")
+with col3:
+    session_label = vega_select("Session", ["Race", "Qualifying"], key="session")
 session_code = {"Race": "R", "Qualifying": "Q"}[session_label]
 
 
@@ -73,13 +77,19 @@ if session_label == "Race":
     fastest = laps[laps["IsPersonalBest"] == True].nsmallest(1, "LapTimeSec") if "IsPersonalBest" in laps.columns else pd.DataFrame()
 
     # Top metrics
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Winner", winner.get("Abbreviation", "—"))
-    m2.metric("Team", winner.get("TeamName", "—"))
+    fastest_driver = "—"
+    fastest_time = "—"
     if not fastest.empty:
         fl = fastest.iloc[0]
-        m3.metric("Fastest Lap", fl["Driver"])
-        m4.metric("Fastest Time", f"{fl['LapTimeSec']:.3f}s")
+        fastest_driver = fl["Driver"]
+        fastest_time = f"{fl['LapTimeSec']:.3f}s"
+
+    vega_metrics([
+        {"label": "Winner", "value": winner.get("Abbreviation", "—")},
+        {"label": "Team", "value": winner.get("TeamName", "—")},
+        {"label": "Fastest Lap", "value": fastest_driver},
+        {"label": "Fastest Time", "value": fastest_time},
+    ])
 
     st.divider()
 
@@ -249,9 +259,10 @@ if session_label == "Race":
 # ── QUALIFYING ────────────────────────────────────────────────────────────────
 else:
     pole = results.iloc[0]
-    m1, m2 = st.columns(2)
-    m1.metric("Pole Position", pole.get("Abbreviation", "—"))
-    m2.metric("Team", pole.get("TeamName", "—"))
+    vega_metrics([
+        {"label": "Pole Position", "value": pole.get("Abbreviation", "—")},
+        {"label": "Team", "value": pole.get("TeamName", "—")},
+    ])
     st.divider()
 
     # Q1 / Q2 / Q3 gap-to-pole horizontal bar charts

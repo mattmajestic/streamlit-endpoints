@@ -14,9 +14,11 @@ import asyncio
 import numpy as np
 import fastf1
 import pandas as pd
+from pathlib import Path
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from starlette.routing import Route
+from starlette.routing import Route, Mount
+from starlette.staticfiles import StaticFiles
 
 
 def _safe_json(obj):
@@ -120,10 +122,13 @@ async def f1_results(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+_COMPONENTS_DIR = Path(__file__).parent / "components"
+
 routes = [
     Route("/health", health, methods=["GET"]),
     Route("/custom/info", info, methods=["GET"]),
     Route("/custom/echo", echo, methods=["POST"]),
     Route("/f1/schedule", f1_schedule, methods=["GET"]),
     Route("/f1/results", f1_results, methods=["GET"]),
+    Mount("/components", app=StaticFiles(directory=_COMPONENTS_DIR, html=True)),
 ]

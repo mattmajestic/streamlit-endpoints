@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://unpkg.com/@heartlandone/vega/style/vega.css">
+  <style>
+    body { margin: 0; padding: 8px 0; font-family: sans-serif; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .card { padding: 12px 18px; border-radius: 8px; background: #f4f4f8; min-width: 110px; }
+    .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .value { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+  </style>
+</head>
+<body>
+  <div id="root" class="row"></div>
+  <script>
+    function toStreamlit(msg) {
+      window.parent.postMessage({ ...msg, isStreamlitMessage: true }, '*');
+    }
+
+    toStreamlit({ type: 'streamlit:componentReady', apiVersion: 1 });
+
+    (async () => {
+      try {
+        const { defineCustomElements } = await import('https://unpkg.com/@heartlandone/vega/loader/index.js');
+        defineCustomElements();
+      } catch (e) { console.warn('Vega load failed:', e); }
+    })();
+
+    function render({ metrics = [] }) {
+      const root = document.getElementById('root');
+      root.innerHTML = metrics.map(({ label, value }) => `
+        <div class="card">
+          <div class="label">${label}</div>
+          <div class="value">${value}</div>
+        </div>
+      `).join('');
+      toStreamlit({ type: 'streamlit:setFrameHeight', height: document.body.scrollHeight + 8 });
+      toStreamlit({ type: 'streamlit:setComponentValue', value: null, dataType: 'json' });
+    }
+
+    window.addEventListener('message', (e) => {
+      if (e.data.type === 'streamlit:render') render(e.data.args || {});
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 8px 0; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    a.btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      color: #374151;
+    }
+    a.btn:hover { background: #f3f4f6; border-color: #6366f1; color: #6366f1; }
+    a.btn.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+    a.btn.primary:hover { background: #4f46e5; border-color: #4f46e5; }
+  </style>
+</head>
+<body>
+  <div id="root" class="row"></div>
+  <script>
+    function toStreamlit(msg) {
+      window.parent.postMessage({ ...msg, isStreamlitMessage: true }, '*');
+    }
+    toStreamlit({ type: 'streamlit:componentReady', apiVersion: 1 });
+
+    function render({ buttons = [] }) {
+      document.getElementById('root').innerHTML = buttons.map(({ label, href, type = 'secondary' }) => `
+        <a class="btn ${type === 'primary' ? 'primary' : ''}"
+           href="${href ?? '#'}"
+           ${href ? 'target="_blank" rel="noopener"' : ''}>
+          ${label}
+        </a>
+      `).join('');
+      toStreamlit({ type: 'streamlit:setFrameHeight', height: document.body.scrollHeight + 8 });
+      toStreamlit({ type: 'streamlit:setComponentValue', value: null, dataType: 'json' });
+    }
+
+    window.addEventListener('message', (e) => {
+      if (e.data.type === 'streamlit:render') render(e.data.args || {});
+    });
+  </script>
+</body>
+</html>

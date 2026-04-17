@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
+from app.components import vega_banner, vega_buttons
 
 load_dotenv(".env.local")
 
@@ -28,9 +29,9 @@ app = App("app/main.py", routes=routes)
 | `/custom/echo` | POST | Echo JSON payload |
 """)
 
-st.info(
-    "Run with `streamlit run app/run.py` or any ASGI server via `uvicorn app.run:app`.",
-    icon="ℹ️",
+vega_banner(
+    "Run with streamlit run app/run.py or any ASGI server via uvicorn app.run:app",
+    type="info",
 )
 
 with st.expander("Try the API endpoints"):
@@ -42,3 +43,8 @@ with st.expander("Try the API endpoints"):
         '  -d \'{"message": "hello"}\'',
         language="bash",
     )
+
+    vega_buttons([
+        {"label": "Open /health", "href": f"{base_url}/health"},
+        {"label": "Open /custom/info", "href": f"{base_url}/custom/info"},
+    ])

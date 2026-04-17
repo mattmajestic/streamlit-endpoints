@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 4px 0; }
+    .banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      width: 100%;
+    }
+    .banner.info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+    .banner.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .banner.warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .banner.error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    function toStreamlit(msg) {
+      window.parent.postMessage({ ...msg, isStreamlitMessage: true }, '*');
+    }
+    toStreamlit({ type: 'streamlit:componentReady', apiVersion: 1 });
+
+    const icons = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '🚨' };
+
+    function render({ message = '', type = 'info' }) {
+      document.getElementById('root').innerHTML = `
+        <div class="banner ${type}">
+          <span class="icon">${icons[type] ?? icons.info}</span>
+          <span>${message}</span>
+        </div>
+      `;
+      toStreamlit({ type: 'streamlit:setFrameHeight', height: document.body.scrollHeight + 8 });
+      toStreamlit({ type: 'streamlit:setComponentValue', value: null, dataType: 'json' });
+    }
+
+    window.addEventListener('message', (e) => {
+      if (e.data.type === 'streamlit:render') render(e.data.args || {});
+    });
+  </script>
+</body>
+</html>

@@ -14,4 +14,8 @@ useStarlette = true
 gatherUsageStats = false
 
 [theme]
-base = "dark"
+base = "light"
+primaryColor = "#6366f1"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f4f8"
+textColor = "#1a1a1a"
