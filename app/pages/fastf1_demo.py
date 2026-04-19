@@ -1,11 +1,12 @@
 import os
+import time
 import streamlit as st
 import httpx
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv
-from app.components import render_footer, render_session_timer, vega_metrics
+from app.components import render_footer, vega_metrics
 from app.f1_store import get_available_years
 from app.theme_utils import get_theme_class, get_vega_imports
 
@@ -70,10 +71,41 @@ session_code = {"Race": "R", "Qualifying": "Q"}[session_label]
 
 
 @st.fragment
-def session_sidebar_timer(session_label: str) -> None:
-    duration_seconds = 7200 if session_label == "Race" else 3600
-    st.markdown("### Streamlit Session Timer")
-    render_session_timer("Streamlit Session Timer", duration_seconds=duration_seconds)
+def session_sidebar_timer(timer_key: str) -> None:
+    if timer_key not in st.session_state:
+        st.session_state[timer_key] = time.time()
+
+    elapsed = max(0, int(time.time() - st.session_state[timer_key]))
+    minutes, seconds = divmod(elapsed, 60)
+
+    st.markdown(
+        f"""
+        <div style="
+            padding: 1rem;
+            border: 1px solid rgba(128, 128, 128, 0.18);
+            border-radius: 0.9rem;
+            background: rgba(240, 242, 246, 0.92);
+            text-align: center;
+        ">
+          <div style="
+              font-size: 0.72rem;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              opacity: 0.72;
+              margin-bottom: 0.45rem;
+          ">Streamlit Session Timer</div>
+          <div style="
+              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+              font-variant-numeric: tabular-nums;
+              font-size: 2rem;
+              font-weight: 700;
+              line-height: 1;
+              min-width: 5ch;
+          ">{minutes:02d}:{seconds:02d}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -96,7 +128,7 @@ with st.spinner(f"Loading {event_name} {session_label}..."):
         st.stop()
 
 with st.sidebar:
-    session_sidebar_timer(session_label)
+    session_sidebar_timer(f"{year}:{event_name}:{session_label}")
 
 st.divider()
 
