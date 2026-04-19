@@ -6,6 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 from app.components import render_footer, vega_metrics
+from app.f1_store import get_available_years
 from app.theme_utils import get_theme_class, get_vega_imports
 
 load_dotenv(".env.local")
@@ -34,10 +35,9 @@ st.components.v1.html(f"""
 </div>
 """, height=120)
 
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    year = st.selectbox("Season", [2025, 2024, 2023], key="year")
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_years() -> list[int]:
+    return get_available_years()
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -49,6 +49,13 @@ def get_schedule(year: int) -> pd.DataFrame:
 
 with st.spinner("Loading calendar..."):
     try:
+        years = get_years()
+        if not years:
+            st.error("No seasons are available yet. Run the migration script to populate Turso.")
+            st.stop()
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            year = st.selectbox("Season", years, index=0, key="year")
         schedule = get_schedule(year)
     except Exception as e:
         st.error(f"Could not load calendar: {e}")

@@ -26,6 +26,9 @@ sys.path.insert(0, str(ROOT))
 
 from app.f1_store import get_connection, _ensure_schema, _upsert_schedule, _upsert_session  # noqa: E402
 
+DEFAULT_YEARS = [2023, 2024, 2025]
+DEFAULT_SESSIONS = ["R", "Q"]
+
 _FASTF1_CACHE_DIR = Path(os.getenv("FASTF1_CACHE_DIR", "/tmp/fastf1_cache"))
 _FASTF1_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 fastf1.Cache.enable_cache(str(_FASTF1_CACHE_DIR))
@@ -84,13 +87,13 @@ def parse_args() -> argparse.Namespace:
         "--years",
         nargs="+",
         type=int,
-        default=[2023, 2024, 2025],
+        default=DEFAULT_YEARS,
         help="Season years to migrate.",
     )
     parser.add_argument(
         "--sessions",
         nargs="+",
-        default=["R", "Q"],
+        default=DEFAULT_SESSIONS,
         help="Session codes to migrate for each round (default: R Q).",
     )
     parser.add_argument(

@@ -17,6 +17,7 @@ env/
 # FastF1 cache
 /tmp/fastf1_cache/
 fastf1_cache/
+.cache/
 
 # Streamlit
 .streamlit/secrets.toml

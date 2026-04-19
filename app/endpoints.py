@@ -14,7 +14,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
-from app.f1_store import df_to_records, get_event_schedule, get_session_bundle
+from app.f1_store import df_to_records, get_available_years, get_event_schedule, get_session_bundle
 
 
 async def health(request: Request) -> JSONResponse:
@@ -48,8 +48,15 @@ async def f1_schedule(request: Request) -> JSONResponse:
         schedule = await asyncio.to_thread(get_event_schedule, year)
         records = df_to_records(schedule[["RoundNumber", "EventName", "Country", "EventDate"]])
         return JSONResponse({"year": year, "schedule": records})
+    except LookupError as e:
+        return JSONResponse({"error": str(e), "available_years": await asyncio.to_thread(get_available_years)}, status_code=404)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def f1_years(request: Request) -> JSONResponse:
+    years = await asyncio.to_thread(get_available_years)
+    return JSONResponse({"years": years})
 
 
 async def f1_results(request: Request) -> JSONResponse:
@@ -71,6 +78,7 @@ routes = [
     Route("/health", health, methods=["GET"]),
     Route("/custom/info", info, methods=["GET"]),
     Route("/custom/echo", echo, methods=["POST"]),
+    Route("/f1/years", f1_years, methods=["GET"]),
     Route("/f1/schedule", f1_schedule, methods=["GET"]),
     Route("/f1/results", f1_results, methods=["GET"]),
     Mount("/components", app=StaticFiles(directory=_COMPONENTS_DIR, html=True)),

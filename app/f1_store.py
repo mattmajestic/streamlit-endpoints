@@ -17,7 +17,8 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency in local d
     libsql = None
 
 
-_LOCAL_DB_PATH = Path(os.getenv("F1_LOCAL_DB_PATH", "/tmp/streamlit_endpoints_f1.db"))
+# Keep the local replica in a cache path so it can survive process restarts when the host allows it.
+_LOCAL_DB_PATH = Path(os.getenv("F1_LOCAL_DB_PATH", ".cache/streamlit_endpoints_f1.db"))
 
 
 def _safe_json(obj: Any) -> Any:
@@ -218,3 +219,18 @@ def get_session_bundle(year: int, round_num: int, session_code: str) -> tuple[pd
     laps = pd.DataFrame(json.loads(stored["laps_json"]))
     results = pd.DataFrame(json.loads(stored["results_json"]))
     return laps, results
+
+
+def get_available_years() -> list[int]:
+    conn = get_connection()
+    _ensure_schema(conn)
+
+    rows = _fetch_all(
+        conn,
+        """
+        SELECT DISTINCT year
+        FROM event_schedule
+        ORDER BY year DESC
+        """,
+    )
+    return [int(row["year"]) for row in rows]
