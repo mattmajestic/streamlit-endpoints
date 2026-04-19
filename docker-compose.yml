@@ -1,10 +1,20 @@
 services:
+  # migrate:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   env_file:
+  #     - .env.local
+  #   command: ["python", "scripts/migrate_f1_turso.py", "--years", "2024", "2025", "--sessions", "R", "Q"]
+
   streamlit:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "8501:8501"
+    env_file:
+      - .env.local
     volumes:
       # Hot-reload app code without rebuilding the image
       - ./app:/app/app

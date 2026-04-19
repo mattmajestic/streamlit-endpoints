@@ -37,6 +37,7 @@ app = App("app/main.py", routes=routes)
 
 | Endpoint | Method | Description |
 |---|---|---|
+| `/f1/schedule` | GET | F1 event schedule |
 | `/health` | GET | Health check |
 | `/custom/info` | GET | App metadata |
 | `/custom/echo` | POST | Echo JSON payload |
@@ -48,6 +49,8 @@ with st.expander("Try the API endpoints", expanded=True):
     col_code, col_empty = st.columns([1, 1])
 
     with col_code:
+        st.code(f"curl {base_url}/f1/schedule?year=2025", language="bash")
+
         st.code(f"curl {base_url}/health", language="bash")
 
         st.code(f"curl {base_url}/custom/info", language="bash")
@@ -60,6 +63,7 @@ with st.expander("Try the API endpoints", expanded=True):
         )
 
         vega_buttons([
+            {"label": "Open /f1/schedule", "href": f"{base_url}/f1/schedule?year=2025", "icon": "fas fa-calendar-days", "variant": "secondary", "iconAlign": "left"},
             {"label": "Open /health", "href": f"{base_url}/health", "icon": "fas fa-heart-pulse", "variant": "secondary", "iconAlign": "left"},
             {"label": "Open /custom/info", "href": f"{base_url}/custom/info", "icon": "fas fa-info-circle", "variant": "secondary", "iconAlign": "right"},
         ])

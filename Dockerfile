@@ -10,9 +10,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install dependencies
+# Install uv and resolve dependencies with it
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uv && uv pip install --system -r requirements.txt
 
 # Copy project files
 COPY .streamlit/ /root/.streamlit/

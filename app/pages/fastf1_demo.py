@@ -71,9 +71,7 @@ def load_session(year: int, round_num: int, stype: str):
     )
     resp.raise_for_status()
     data = resp.json()
-    laps = pd.DataFrame(data["laps"])
-    results = pd.DataFrame(data["results"])
-    return laps, results
+    return pd.DataFrame(data["laps"]), pd.DataFrame(data["results"])
 
 
 with st.spinner(f"Loading {event_name} {session_label}..."):
