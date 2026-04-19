@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv
-from app.components import render_footer, vega_metrics
+from app.components import render_footer, render_session_timer, vega_metrics
 from app.f1_store import get_available_years
 from app.theme_utils import get_theme_class, get_vega_imports
 
@@ -69,6 +69,13 @@ with col3:
 session_code = {"Race": "R", "Qualifying": "Q"}[session_label]
 
 
+@st.fragment
+def session_sidebar_timer(session_label: str) -> None:
+    duration_seconds = 7200 if session_label == "Race" else 3600
+    st.markdown("### Streamlit Session Timer")
+    render_session_timer("Streamlit Session Timer", duration_seconds=duration_seconds)
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_session(year: int, round_num: int, stype: str):
     resp = httpx.get(
@@ -87,6 +94,9 @@ with st.spinner(f"Loading {event_name} {session_label}..."):
     except Exception as e:
         st.error(f"Could not load session: {e}")
         st.stop()
+
+with st.sidebar:
+    session_sidebar_timer(session_label)
 
 st.divider()
 

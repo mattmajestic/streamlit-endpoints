@@ -9,11 +9,14 @@ Routes are registered via the App class in app/run.py:
 
 import sys
 import asyncio
+import json
+import time
 from pathlib import Path
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.routing import Route, Mount
+from starlette.routing import Route, Mount, WebSocketRoute
 from starlette.staticfiles import StaticFiles
+from starlette.websockets import WebSocket, WebSocketDisconnect
 from app.f1_store import df_to_records, get_available_years, get_event_schedule, get_session_bundle
 
 
@@ -72,6 +75,40 @@ async def f1_results(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+async def session_timer_socket(websocket: WebSocket) -> None:
+    """
+    WebSocket /ws/session-timer?label=...&duration=...
+
+    Streams a lightweight elapsed timer for the sidebar widget.
+    """
+    await websocket.accept()
+    label = websocket.query_params.get("label", "Session")
+    try:
+        duration = int(websocket.query_params.get("duration", "0") or 0)
+    except ValueError:
+        duration = 0
+
+    started_at = time.monotonic()
+    try:
+        while True:
+            elapsed = int(time.monotonic() - started_at)
+            remaining = max(duration - elapsed, 0) if duration > 0 else None
+            payload = {
+                "label": label,
+                "elapsed_seconds": elapsed,
+                "elapsed": f"{elapsed // 60:02d}:{elapsed % 60:02d}",
+                "remaining_seconds": remaining,
+                "remaining": None if remaining is None else f"{remaining // 60:02d}:{remaining % 60:02d}",
+                "finished": bool(duration > 0 and elapsed >= duration),
+            }
+            await websocket.send_text(json.dumps(payload))
+            if duration > 0 and elapsed >= duration:
+                break
+            await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        return
+
+
 _COMPONENTS_DIR = Path(__file__).parent / "components"
 
 routes = [
@@ -81,5 +118,6 @@ routes = [
     Route("/f1/years", f1_years, methods=["GET"]),
     Route("/f1/schedule", f1_schedule, methods=["GET"]),
     Route("/f1/results", f1_results, methods=["GET"]),
+    WebSocketRoute("/ws/session-timer", session_timer_socket),
     Mount("/components", app=StaticFiles(directory=_COMPONENTS_DIR, html=True)),
 ]

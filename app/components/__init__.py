@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as st_components
+from app.components.session_timer import render_session_timer
 
 _BASE = os.getenv("API_BASE_URL", "http://localhost:8501")
 _COMPONENTS_DIR = Path(__file__).resolve().parent
