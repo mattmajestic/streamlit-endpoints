@@ -5,7 +5,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv
-from app.components import vega_metrics, vega_select
+from app.components import render_footer, vega_metrics
+from app.theme_utils import get_theme_class, get_vega_imports
 
 load_dotenv(".env.local")
 
@@ -19,11 +20,24 @@ COMPOUND_COLORS = {
     "WET": "#0067ff",
 }
 
-st.title("🏎️ FastF1 Analytics")
+st.components.v1.html(f"""
+{get_vega_imports()}
+
+<div {get_theme_class()}>
+<vega-font
+  variant="font-h1"
+  as="h1"
+  style="font-weight: bold; font-size: 4rem;"
+>
+  🏎️ FastF1 Analytics
+</vega-font>
+</div>
+""", height=120)
+
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    year = vega_select("Season", [2025, 2024, 2023], key="year")
+    year = st.selectbox("Season", [2025, 2024, 2023], key="year")
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -42,9 +56,9 @@ with st.spinner("Loading calendar..."):
 
 event_map = {row.EventName: int(row.RoundNumber) for row in schedule.itertuples()}
 with col2:
-    event_name = vega_select("Grand Prix", list(event_map.keys()), key="event")
+    event_name = st.selectbox("Grand Prix", list(event_map.keys()), key="event")
 with col3:
-    session_label = vega_select("Session", ["Race", "Qualifying"], key="session")
+    session_label = st.selectbox("Session", ["Race", "Qualifying"], key="session")
 session_code = {"Race": "R", "Qualifying": "Q"}[session_label]
 
 
@@ -94,7 +108,15 @@ if session_label == "Race":
     st.divider()
 
     # Lap time evolution — top 5 with animation
-    st.subheader("Lap Times — Top 5 Finishers")
+    st.components.v1.html("""
+<vega-font
+  variant="font-h4"
+  as="h4"
+  style="font-weight: bold;"
+>
+  Lap Times — Top 5 Finishers
+</vega-font>
+""", height=44)
     top5 = results["Abbreviation"].head(5).tolist()
     chart_laps = laps[laps["Driver"].isin(top5)].dropna(subset=["LapTimeSec"]).copy()
     if not chart_laps.empty:
@@ -188,7 +210,15 @@ if session_label == "Race":
         col_left, col_right = st.columns(2)
 
         with col_left:
-            st.subheader("Positions Gained / Lost")
+            st.components.v1.html("""
+<vega-font
+  variant="font-h4"
+  as="h4"
+  style="font-weight: bold;"
+>
+  Positions Gained / Lost
+</vega-font>
+""", height=44)
             fig_changes = go.Figure(go.Bar(
                 x=rc["Abbreviation"],
                 y=rc["Change"],
@@ -207,7 +237,15 @@ if session_label == "Race":
             st.plotly_chart(fig_changes, use_container_width=True)
 
         with col_right:
-            st.subheader("Grid vs Finish Position")
+            st.components.v1.html("""
+<vega-font
+  variant="font-h4"
+  as="h4"
+  style="font-weight: bold;"
+>
+  Grid vs Finish Position
+</vega-font>
+""", height=44)
             fig_grid = go.Figure()
             fig_grid.add_trace(go.Scatter(
                 x=rc["GridPos"],
@@ -236,7 +274,15 @@ if session_label == "Race":
     st.divider()
 
     # Tyre strategy timeline
-    st.subheader("Tyre Strategy")
+    st.components.v1.html("""
+<vega-font
+  variant="font-h4"
+  as="h4"
+  style="font-weight: bold;"
+>
+  Tyre Strategy
+</vega-font>
+""", height=44)
     strat = laps.dropna(subset=["Compound", "LapNumber"]).copy() if "Compound" in laps.columns else pd.DataFrame()
     if not strat.empty:
         fig_tyre = px.scatter(
@@ -283,7 +329,15 @@ else:
         q_data["Gap"] = q_data["Seconds"] - pole_time
         q_data["Label"] = q_data["Gap"].apply(lambda g: "POLE" if g == 0 else f"+{g:.3f}s")
 
-        st.subheader(f"{q_col} — Gap to Pole")
+        st.components.v1.html(f"""
+<vega-font
+  variant="font-h4"
+  as="h4"
+  style="font-weight: bold;"
+>
+  {q_col} — Gap to Pole
+</vega-font>
+""", height=30)
         fig_q = px.bar(
             q_data,
             x="Gap",
@@ -304,3 +358,7 @@ else:
         fig_q.update_traces(textposition="outside")
         st.plotly_chart(fig_q, use_container_width=True)
         st.divider()
+
+# Footer with country flag
+st.divider()
+render_footer()

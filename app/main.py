@@ -2,7 +2,7 @@ import streamlit as st
 
 st.set_page_config(
     page_title="Streamlit + Starlette",
-    page_icon="🚀",
+    page_icon="https://github.com/mattmajestic/majesticcoding.com/blob/main/static/img/mc-logo.png?raw=true",
     layout="wide",
 )
 

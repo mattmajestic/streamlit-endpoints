@@ -4,50 +4,78 @@
   <meta charset="utf-8">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 8px 0; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    a.btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      text-decoration: none;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-      border: 1px solid #d1d5db;
-      background: #fff;
-      color: #374151;
-    }
-    a.btn:hover { background: #f3f4f6; border-color: #6366f1; color: #6366f1; }
-    a.btn.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
-    a.btn.primary:hover { background: #4f46e5; border-color: #4f46e5; }
+    body { padding: 8px 0; }
+    #root { display: flex; gap: 8px; flex-wrap: wrap; }
   </style>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <!-- Vega Web Components (HTML version, not React) -->
+  <script type="module" src="https://unpkg.com/@heartlandone/vega@latest/dist/vega/vega.esm.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@heartlandone/vega@latest/dist/vega/vega.css">
 </head>
 <body>
-  <div id="root" class="row"></div>
+  <div id="root"></div>
+
   <script>
     function toStreamlit(msg) {
       window.parent.postMessage({ ...msg, isStreamlitMessage: true }, '*');
     }
+
     toStreamlit({ type: 'streamlit:componentReady', apiVersion: 1 });
 
+    function handleVegaClick(button, index) {
+      if (button.href) {
+        window.open(button.href, '_blank', 'noopener,noreferrer');
+      }
+
+      toStreamlit({
+        type: 'streamlit:setComponentValue',
+        value: { clicked: button, index },
+        dataType: 'json'
+      });
+    }
+
     function render({ buttons = [] }) {
-      document.getElementById('root').innerHTML = buttons.map(({ label, href, type = 'secondary' }) => `
-        <a class="btn ${type === 'primary' ? 'primary' : ''}"
-           href="${href ?? '#'}"
-           ${href ? 'target="_blank" rel="noopener"' : ''}>
-          ${label}
-        </a>
-      `).join('');
-      toStreamlit({ type: 'streamlit:setFrameHeight', height: document.body.scrollHeight + 8 });
-      toStreamlit({ type: 'streamlit:setComponentValue', value: null, dataType: 'json' });
+      const root = document.getElementById('root');
+
+      // Clear previous content
+      root.innerHTML = '';
+
+      if (buttons.length === 0) {
+        root.innerHTML = '<p>No buttons to display</p>';
+        return;
+      }
+
+      // Create Vega buttons using web components
+      buttons.forEach((button, index) => {
+        const vegaButton = document.createElement('vega-button');
+
+        // Set attributes
+        if (button.label) vegaButton.setAttribute('label', button.label);
+        if (button.icon) vegaButton.setAttribute('icon', button.icon);
+        if (button.variant) vegaButton.setAttribute('variant', button.variant);
+        if (button.iconAlign) vegaButton.setAttribute('icon-align', button.iconAlign);
+        if (button.size) vegaButton.setAttribute('size', button.size);
+        if (button.disabled) vegaButton.setAttribute('disabled', '');
+
+        // Add click handler
+        vegaButton.addEventListener('vegaClick', () => handleVegaClick(button, index));
+
+        // Append to root
+        root.appendChild(vegaButton);
+      });
+
+      // Set simple fixed height once
+      toStreamlit({
+        type: 'streamlit:setFrameHeight',
+        height: 60
+      });
     }
 
     window.addEventListener('message', (e) => {
-      if (e.data.type === 'streamlit:render') render(e.data.args || {});
+      if (e.data.type === 'streamlit:render') {
+        render(e.data.args || {});
+      }
     });
   </script>
 </body>

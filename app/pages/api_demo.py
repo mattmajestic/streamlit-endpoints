@@ -1,13 +1,26 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-from app.components import vega_banner, vega_buttons
+from app.components import render_footer, vega_buttons
+from app.theme_utils import get_theme_class, get_vega_imports
 
 load_dotenv(".env.local")
 
 base_url = os.getenv("API_BASE_URL", "http://localhost:8501")
 
-st.title("🔌 Starlette API Demo")
+st.components.v1.html(f"""
+{get_vega_imports()}
+
+<div {get_theme_class()}>
+<vega-font
+  variant="font-h1"
+  as="h1"
+  style="font-weight: bold; font-size: 4rem;"
+>
+  🔌 Starlette API Demo
+</vega-font>
+</div>
+""", height=120)
 
 st.markdown("""
 This app uses Streamlit's experimental **`App` class** from `streamlit.starlette`
@@ -29,22 +42,28 @@ app = App("app/main.py", routes=routes)
 | `/custom/echo` | POST | Echo JSON payload |
 """)
 
-vega_banner(
-    "Run with streamlit run app/run.py or any ASGI server via uvicorn app.run:app",
-    type="info",
-)
+st.info("Run with streamlit run app/run.py or any ASGI server via uvicorn app.run:app")
 
-with st.expander("Try the API endpoints"):
-    st.code(f"curl {base_url}/health", language="bash")
-    st.code(f"curl {base_url}/custom/info", language="bash")
-    st.code(
-        f'curl -X POST {base_url}/custom/echo \\\n'
-        '  -H "Content-Type: application/json" \\\n'
-        '  -d \'{"message": "hello"}\'',
-        language="bash",
-    )
+with st.expander("Try the API endpoints", expanded=True):
+    col_code, col_empty = st.columns([1, 1])
 
-    vega_buttons([
-        {"label": "Open /health", "href": f"{base_url}/health"},
-        {"label": "Open /custom/info", "href": f"{base_url}/custom/info"},
-    ])
+    with col_code:
+        st.code(f"curl {base_url}/health", language="bash")
+
+        st.code(f"curl {base_url}/custom/info", language="bash")
+
+        st.code(
+            f'curl -X POST {base_url}/custom/echo \\\n'
+            '  -H "Content-Type: application/json" \\\n'
+            '  -d \'{"message": "hello"}\'',
+            language="bash",
+        )
+
+        vega_buttons([
+            {"label": "Open /health", "href": f"{base_url}/health", "icon": "fas fa-heart-pulse", "variant": "secondary", "iconAlign": "left"},
+            {"label": "Open /custom/info", "href": f"{base_url}/custom/info", "icon": "fas fa-info-circle", "variant": "secondary", "iconAlign": "right"},
+        ])
+
+# Footer with country flag
+st.divider()
+render_footer()

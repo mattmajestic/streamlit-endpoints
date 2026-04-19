@@ -35,3 +35,5 @@ fastf1_cache/
 # OS
 .DS_Store
 Thumbs.db
+
+.codex
