@@ -70,8 +70,9 @@ with col3:
 session_code = {"Race": "R", "Qualifying": "Q"}[session_label]
 
 
-@st.fragment
-def session_sidebar_timer(timer_key: str) -> None:
+@st.fragment(run_every=1)
+def session_sidebar_timer() -> None:
+    timer_key = "streamlit_session_timer_start"
     if timer_key not in st.session_state:
         st.session_state[timer_key] = time.time()
 
@@ -128,7 +129,7 @@ with st.spinner(f"Loading {event_name} {session_label}..."):
         st.stop()
 
 with st.sidebar:
-    session_sidebar_timer(f"{year}:{event_name}:{session_label}")
+    session_sidebar_timer()
 
 st.divider()
 
